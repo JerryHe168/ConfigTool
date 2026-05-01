@@ -395,6 +395,7 @@ ParseResult IniParser::parseStream(std::istream& stream)
     ParseResult result;
     std::string currentSection = normalizeSectionName(m_options.defaultSectionName);
     std::vector<std::string> includeStack;
+    std::string normalizedIncludeSection = normalizeSectionName(m_options.includeSection);
     
     result.sections[currentSection] = {};
     
@@ -428,7 +429,11 @@ ParseResult IniParser::parseStream(std::istream& stream)
             std::string normalizedKey = normalizeKeyName(key);
             std::string processedValue = processValue(value);
             
-            if (currentSection == "path" && normalizedKey == m_options.includeKey) {
+            bool isIncludeKey = (normalizedKey == m_options.includeKey);
+            bool isIncludeSection = m_options.includeSection.empty() || 
+                                    (currentSection == normalizedIncludeSection);
+            
+            if (isIncludeKey && isIncludeSection) {
                 processInclude(processedValue, result, includeStack);
             } else {
                 result.sections[currentSection][normalizedKey] = processedValue;
