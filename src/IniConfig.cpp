@@ -199,7 +199,9 @@ bool IniConfig::saveStream(std::ostream& stream) const
     try {
         for (const auto& [sectionName, keyValues] : m_data) {
             if (keyValues.empty() && sectionName != m_options.defaultSectionName) {
-                continue;
+                if (!m_options.saveEmptySections) {
+                    continue;
+                }
             }
             
             if (sectionName != m_options.defaultSectionName) {
@@ -299,7 +301,7 @@ bool IniConfig::getBool(const std::string& sectionName, const std::string& keyNa
 bool IniConfig::getBool(const std::string& sectionName, const std::string& keyName,
                          bool defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    if (success) *success = true;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -328,7 +330,7 @@ int IniConfig::getInt(const std::string& sectionName, const std::string& keyName
 int IniConfig::getInt(const std::string& sectionName, const std::string& keyName,
                        int defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    if (success) *success = true;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -357,7 +359,7 @@ long IniConfig::getLong(const std::string& sectionName, const std::string& keyNa
 long IniConfig::getLong(const std::string& sectionName, const std::string& keyName,
                          long defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    if (success) *success = true;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -386,7 +388,7 @@ double IniConfig::getDouble(const std::string& sectionName, const std::string& k
 double IniConfig::getDouble(const std::string& sectionName, const std::string& keyName,
                              double defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    if (success) *success = true;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {

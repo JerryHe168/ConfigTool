@@ -16,7 +16,9 @@ struct ParseOptions {
     bool trimWhitespace = true;
     bool allowQuotedValues = true;
     bool processEscapes = true;
+    bool saveEmptySections = true;
     std::string commentChars = ";#";
+    std::string includeSection = "path";
     std::string includeKey = "include";
     std::string defaultSectionName = "DEFAULT";
 };
