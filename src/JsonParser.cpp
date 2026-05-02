@@ -3,6 +3,9 @@
 #include <sstream>
 #include <cctype>
 #include <iomanip>
+#include <limits>
+#include <charconv>
+#include <system_error>
 
 namespace INI {
 
@@ -161,7 +164,14 @@ void JsonValue::writeInternal(std::ostream& stream, int indent, int currentInden
             } else if (val == -std::numeric_limits<double>::infinity()) {
                 stream << "-1e1000";
             } else {
-                stream << std::setprecision(15) << val;
+                char buf[64];
+                auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), val,
+                    std::chars_format::general, std::numeric_limits<double>::max_digits10);
+                if (ec == std::errc()) {
+                    stream.write(buf, ptr - buf);
+                } else {
+                    stream << std::setprecision(std::numeric_limits<double>::max_digits10) << val;
+                }
             }
             break;
         }
