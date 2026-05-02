@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
+#include <charconv>
+#include <limits>
+#include <system_error>
 
 namespace INI {
 
@@ -613,8 +616,10 @@ std::shared_ptr<JsonValue> IniConfig::toJson() const
     auto root = JsonValue::createObject();
     
     for (const auto& [sectionName, keyValues] : m_data) {
-        if (sectionName == m_options.defaultSectionName && keyValues.empty()) {
-            continue;
+        if (keyValues.empty() && sectionName != m_options.defaultSectionName) {
+            if (!m_options.saveEmptySections) {
+                continue;
+            }
         }
         
         auto sectionObj = JsonValue::createObject();
@@ -696,7 +701,7 @@ void IniConfig::fromJson(const std::shared_ptr<JsonValue>& json)
             std::string strValue;
             switch (value->getType()) {
                 case JsonType::Null:
-                    strValue = "null";
+                    strValue = "";
                     break;
                 case JsonType::Boolean:
                     strValue = value->getBoolean() ? "true" : "false";
@@ -705,9 +710,17 @@ void IniConfig::fromJson(const std::shared_ptr<JsonValue>& json)
                     strValue = std::to_string(value->getInteger());
                     break;
                 case JsonType::Double: {
-                    std::ostringstream oss;
-                    oss << std::setprecision(15) << value->getDouble();
-                    strValue = oss.str();
+                    double d = value->getDouble();
+                    char buf[64];
+                    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), d,
+                        std::chars_format::general, std::numeric_limits<double>::max_digits10);
+                    if (ec == std::errc()) {
+                        strValue = std::string(buf, ptr);
+                    } else {
+                        std::ostringstream oss;
+                        oss << std::setprecision(std::numeric_limits<double>::max_digits10) << d;
+                        strValue = oss.str();
+                    }
                     break;
                 }
                 case JsonType::String:
