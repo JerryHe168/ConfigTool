@@ -15,13 +15,20 @@ class IniConfig {
 public:
     explicit IniConfig(const ParseOptions& options = ParseOptions());
     
-    bool loadFile(const std::string& filepath);
-    bool loadString(const std::string& content);
-    bool loadStream(std::istream& stream);
+    bool loadFile(const std::string& filepath) noexcept;
+    bool loadString(const std::string& content) noexcept;
+    bool loadStream(std::istream& stream) noexcept;
     
-    bool saveFile(const std::string& filepath) const;
-    bool saveStream(std::ostream& stream) const;
-    std::string saveToString() const;
+    void loadFileOrThrow(const std::string& filepath);
+    void loadStringOrThrow(const std::string& content);
+    void loadStreamOrThrow(std::istream& stream);
+    
+    bool saveFile(const std::string& filepath) const noexcept;
+    bool saveStream(std::ostream& stream) const noexcept;
+    std::string saveToString() const noexcept;
+    
+    void saveFileOrThrow(const std::string& filepath) const;
+    void saveStreamOrThrow(std::ostream& stream) const;
     
     bool hasSection(const std::string& sectionName) const;
     bool hasKey(const std::string& sectionName, const std::string& keyName) const;
@@ -73,6 +80,8 @@ public:
     
     void setValidator(std::shared_ptr<IniValidator> validator);
     bool validate() const;
+    std::vector<std::string> validateAndGetErrors() const;
+    void clearValidationErrors();
     
     const std::vector<std::string>& getIncludedFiles() const noexcept { return m_includedFiles; }
     const std::vector<std::string>& getWarnings() const noexcept { return m_warnings; }

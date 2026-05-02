@@ -68,6 +68,7 @@ private:
     
     static std::string getDirectoryPath(const std::string& filepath);
     static std::string combinePaths(const std::string& base, const std::string& relative);
+    static std::string normalizePath(const std::string& path);
 };
 
 } // namespace INI

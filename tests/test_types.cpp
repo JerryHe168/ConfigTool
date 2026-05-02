@@ -37,10 +37,13 @@ mixed_case = TrUe
     config.getBool("booleans", "true_val", false, &success);
     assert(success == true);
     
+    assert(!config.hasKey("booleans", "invalid"));
     config.getBool("booleans", "invalid", false, &success);
     assert(success == false);
     
     config.set("test", "invalid_bool", "not_a_bool");
+    config.getBool("test", "invalid_bool", true, &success);
+    assert(success == false);
     assert(config.getBool("test", "invalid_bool", true) == true);
     
     config.setBool("test", "new_true", true);
@@ -208,6 +211,7 @@ void testSuccessFlag()
     assert(success == false);
     assert(invalidVal == 999);
     
+    assert(!config.hasKey("test", "missing"));
     int missingVal = config.getInt("test", "missing", 111, &success);
     assert(success == false);
     assert(missingVal == 111);

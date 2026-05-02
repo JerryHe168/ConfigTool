@@ -51,11 +51,17 @@ std::string IniParser::unescape(const std::string& str)
             switch (str[i + 1]) {
                 case 'n': result += '\n'; ++i; break;
                 case 't': result += '\t'; ++i; break;
+                case 'r': result += '\r'; ++i; break;
+                case '0': result += '\0'; ++i; break;
+                case 'a': result += '\a'; ++i; break;
+                case 'b': result += '\b'; ++i; break;
+                case 'f': result += '\f'; ++i; break;
+                case 'v': result += '\v'; ++i; break;
                 case '\\': result += '\\'; ++i; break;
                 case ';': result += ';'; ++i; break;
                 case '#': result += '#'; ++i; break;
-                case 'r': result += '\r'; ++i; break;
-                case '0': result += '\0'; ++i; break;
+                case '"': result += '"'; ++i; break;
+                case '\'': result += '\''; ++i; break;
                 default: result += str[i]; break;
             }
         } else {
@@ -75,11 +81,17 @@ std::string IniParser::escape(const std::string& str)
         switch (c) {
             case '\n': result += "\\n"; break;
             case '\t': result += "\\t"; break;
+            case '\r': result += "\\r"; break;
+            case '\0': result += "\\0"; break;
+            case '\a': result += "\\a"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\v': result += "\\v"; break;
             case '\\': result += "\\\\"; break;
             case ';': result += "\\;"; break;
             case '#': result += "\\#"; break;
-            case '\r': result += "\\r"; break;
-            case '\0': result += "\\0"; break;
+            case '"': result += "\\\""; break;
+            case '\'': result += "\\'"; break;
             default: result += c; break;
         }
     }
@@ -270,6 +282,32 @@ std::string IniParser::processValue(const std::string& value) const
     return result;
 }
 
+std::string IniParser::normalizePath(const std::string& path)
+{
+    std::string result = path;
+    
+#ifdef _WIN32
+    char preferredSep = '\\';
+    char altSep = '/';
+#else
+    char preferredSep = '/';
+    char altSep = '\\';
+#endif
+    
+    for (char& c : result) {
+        if (c == altSep) {
+            c = preferredSep;
+        }
+    }
+    
+#ifdef _WIN32
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+#endif
+    
+    return result;
+}
+
 std::string IniParser::getDirectoryPath(const std::string& filepath)
 {
 #ifdef _WIN32
@@ -294,23 +332,30 @@ std::string IniParser::combinePaths(const std::string& base, const std::string& 
 #ifdef _WIN32
     bool isAbsolute = (relative.size() >= 2 && relative[1] == ':') || 
                       (relative.size() >= 1 && (relative[0] == '\\' || relative[0] == '/'));
+    char sep = '\\';
 #else
     bool isAbsolute = !relative.empty() && relative[0] == '/';
+    char sep = '/';
 #endif
     
     if (isAbsolute) {
         return relative;
     }
     
+    bool needsSep = true;
 #ifdef _WIN32
-    if (base.back() != '\\' && base.back() != '/') {
-        return base + "\\" + relative;
+    if (base.back() == '\\' || base.back() == '/') {
+        needsSep = false;
     }
 #else
-    if (base.back() != '/') {
-        return base + "/" + relative;
+    if (base.back() == '/') {
+        needsSep = false;
     }
 #endif
+    
+    if (needsSep) {
+        return base + sep + relative;
+    }
     
     return base + relative;
 }
@@ -327,8 +372,10 @@ void IniParser::processInclude(const std::string& includePath, ParseResult& resu
         resolvedPath = combinePaths(dir, includePath);
     }
     
+    std::string normalizedPath = normalizePath(resolvedPath);
+    
     for (const auto& stackItem : includeStack) {
-        if (stackItem == resolvedPath) {
+        if (normalizePath(stackItem) == normalizedPath) {
             std::stringstream ss;
             ss << "Circular include detected: ";
             for (const auto& item : includeStack) {
@@ -399,6 +446,15 @@ ParseResult IniParser::parseStream(std::istream& stream)
     
     result.sections[currentSection] = {};
     
+    unsigned char bom[3] = {0};
+    if (stream.read(reinterpret_cast<char*>(bom), 3)) {
+        if (!(bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)) {
+            stream.seekg(-3, std::ios::cur);
+        }
+    } else {
+        stream.clear();
+    }
+    
     std::string line;
     while (std::getline(stream, line)) {
         ++m_currentLine;
@@ -430,8 +486,7 @@ ParseResult IniParser::parseStream(std::istream& stream)
             std::string processedValue = processValue(value);
             
             bool isIncludeKey = (normalizedKey == m_options.includeKey);
-            bool isIncludeSection = m_options.includeSection.empty() || 
-                                    (currentSection == normalizedIncludeSection);
+            bool isIncludeSection = (currentSection == normalizedIncludeSection);
             
             if (isIncludeKey && isIncludeSection) {
                 processInclude(processedValue, result, includeStack);

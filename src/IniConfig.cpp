@@ -129,106 +129,137 @@ double IniConfig::stringToDouble(const std::string& str, bool& success)
     return 0.0;
 }
 
-bool IniConfig::loadFile(const std::string& filepath)
+void IniConfig::loadFileOrThrow(const std::string& filepath)
+{
+    IniParser parser(m_options);
+    ParseResult result = parser.parseFile(filepath);
+    
+    m_data = result.sections;
+    m_includedFiles = result.includedFiles;
+    m_warnings = result.warnings;
+    m_loadedFile = filepath;
+}
+
+void IniConfig::loadStringOrThrow(const std::string& content)
+{
+    IniParser parser(m_options);
+    ParseResult result = parser.parseString(content);
+    
+    m_data = result.sections;
+    m_includedFiles = result.includedFiles;
+    m_warnings = result.warnings;
+    m_loadedFile.clear();
+}
+
+void IniConfig::loadStreamOrThrow(std::istream& stream)
+{
+    IniParser parser(m_options);
+    ParseResult result = parser.parseStream(stream);
+    
+    m_data = result.sections;
+    m_includedFiles = result.includedFiles;
+    m_warnings = result.warnings;
+    m_loadedFile.clear();
+}
+
+bool IniConfig::loadFile(const std::string& filepath) noexcept
 {
     try {
-        IniParser parser(m_options);
-        ParseResult result = parser.parseFile(filepath);
-        
-        m_data = result.sections;
-        m_includedFiles = result.includedFiles;
-        m_warnings = result.warnings;
-        m_loadedFile = filepath;
-        
+        loadFileOrThrow(filepath);
         return true;
     } catch (...) {
         return false;
     }
 }
 
-bool IniConfig::loadString(const std::string& content)
+bool IniConfig::loadString(const std::string& content) noexcept
 {
     try {
-        IniParser parser(m_options);
-        ParseResult result = parser.parseString(content);
-        
-        m_data = result.sections;
-        m_includedFiles = result.includedFiles;
-        m_warnings = result.warnings;
-        m_loadedFile.clear();
-        
+        loadStringOrThrow(content);
         return true;
     } catch (...) {
         return false;
     }
 }
 
-bool IniConfig::loadStream(std::istream& stream)
+bool IniConfig::loadStream(std::istream& stream) noexcept
 {
     try {
-        IniParser parser(m_options);
-        ParseResult result = parser.parseStream(stream);
-        
-        m_data = result.sections;
-        m_includedFiles = result.includedFiles;
-        m_warnings = result.warnings;
-        m_loadedFile.clear();
-        
+        loadStreamOrThrow(stream);
         return true;
     } catch (...) {
         return false;
     }
 }
 
-bool IniConfig::saveFile(const std::string& filepath) const
+void IniConfig::saveFileOrThrow(const std::string& filepath) const
 {
-    try {
-        std::ofstream file(filepath);
-        if (!file.is_open()) {
-            return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw FileException(filepath, "open");
+    }
+    
+    saveStreamOrThrow(file);
+}
+
+void IniConfig::saveStreamOrThrow(std::ostream& stream) const
+{
+    bool isFirstSection = true;
+    
+    for (const auto& [sectionName, keyValues] : m_data) {
+        if (keyValues.empty() && sectionName != m_options.defaultSectionName) {
+            if (!m_options.saveEmptySections) {
+                continue;
+            }
         }
         
-        return saveStream(file);
-    } catch (...) {
-        return false;
-    }
-}
-
-bool IniConfig::saveStream(std::ostream& stream) const
-{
-    try {
-        for (const auto& [sectionName, keyValues] : m_data) {
-            if (keyValues.empty() && sectionName != m_options.defaultSectionName) {
-                if (!m_options.saveEmptySections) {
-                    continue;
-                }
-            }
-            
-            if (sectionName != m_options.defaultSectionName) {
-                stream << "[" << sectionName << "]" << std::endl;
-            }
-            
-            for (const auto& [key, value] : keyValues) {
-                std::string escapedValue = IniParser::escape(value);
-                bool needsQuotes = escapedValue.find_first_of(" \t\n\r\"") != std::string::npos;
-                
-                if (needsQuotes) {
-                    stream << key << " = \"" << escapedValue << "\"" << std::endl;
-                } else {
-                    stream << key << " = " << escapedValue << std::endl;
-                }
-            }
-            
+        if (!isFirstSection) {
             stream << std::endl;
         }
+        isFirstSection = false;
         
-        return stream.good();
+        if (sectionName != m_options.defaultSectionName) {
+            stream << "[" << sectionName << "]" << std::endl;
+        }
+        
+        for (const auto& [key, value] : keyValues) {
+            std::string escapedValue = IniParser::escape(value);
+            bool needsQuotes = escapedValue.find_first_of(" \t\n\r\"") != std::string::npos;
+            
+            if (needsQuotes) {
+                stream << key << " = \"" << escapedValue << "\"" << std::endl;
+            } else {
+                stream << key << " = " << escapedValue << std::endl;
+            }
+        }
+    }
+    
+    if (!stream.good()) {
+        throw FileException("", "write");
+    }
+}
+
+bool IniConfig::saveFile(const std::string& filepath) const noexcept
+{
+    try {
+        saveFileOrThrow(filepath);
+        return true;
     } catch (...) {
         return false;
     }
 }
 
-std::string IniConfig::saveToString() const
+bool IniConfig::saveStream(std::ostream& stream) const noexcept
+{
+    try {
+        saveStreamOrThrow(stream);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+std::string IniConfig::saveToString() const noexcept
 {
     std::ostringstream oss;
     saveStream(oss);
@@ -301,7 +332,7 @@ bool IniConfig::getBool(const std::string& sectionName, const std::string& keyNa
 bool IniConfig::getBool(const std::string& sectionName, const std::string& keyName,
                          bool defaultValue, bool* success) const
 {
-    if (success) *success = true;
+    if (success) *success = false;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -330,7 +361,7 @@ int IniConfig::getInt(const std::string& sectionName, const std::string& keyName
 int IniConfig::getInt(const std::string& sectionName, const std::string& keyName,
                        int defaultValue, bool* success) const
 {
-    if (success) *success = true;
+    if (success) *success = false;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -359,7 +390,7 @@ long IniConfig::getLong(const std::string& sectionName, const std::string& keyNa
 long IniConfig::getLong(const std::string& sectionName, const std::string& keyName,
                          long defaultValue, bool* success) const
 {
-    if (success) *success = true;
+    if (success) *success = false;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -388,7 +419,7 @@ double IniConfig::getDouble(const std::string& sectionName, const std::string& k
 double IniConfig::getDouble(const std::string& sectionName, const std::string& keyName,
                              double defaultValue, bool* success) const
 {
-    if (success) *success = true;
+    if (success) *success = false;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -483,15 +514,27 @@ void IniConfig::setValidator(std::shared_ptr<IniValidator> validator)
     m_validator = validator;
 }
 
-bool IniConfig::validate() const
+std::vector<std::string> IniConfig::validateAndGetErrors() const
 {
-    m_validationErrors.clear();
+    std::vector<std::string> errors;
     
     if (!m_validator) {
-        return true;
+        return errors;
     }
     
-    return m_validator->validate(m_data, m_validationErrors);
+    m_validator->validate(m_data, errors);
+    return errors;
+}
+
+bool IniConfig::validate() const
+{
+    m_validationErrors = validateAndGetErrors();
+    return m_validationErrors.empty();
+}
+
+void IniConfig::clearValidationErrors()
+{
+    m_validationErrors.clear();
 }
 
 } // namespace INI
