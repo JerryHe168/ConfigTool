@@ -2,6 +2,7 @@
 
 #include "IniParser.h"
 #include "IniValidator.h"
+#include "JsonParser.h"
 
 #include <string>
 #include <map>
@@ -30,6 +31,24 @@ public:
     
     void saveFileOrThrow(const std::string& filepath) const;
     void saveStreamOrThrow(std::ostream& stream) const;
+    
+    bool loadJsonFile(const std::string& filepath) noexcept;
+    bool loadJsonString(const std::string& content) noexcept;
+    bool loadJsonStream(std::istream& stream) noexcept;
+    
+    void loadJsonFileOrThrow(const std::string& filepath);
+    void loadJsonStringOrThrow(const std::string& content);
+    void loadJsonStreamOrThrow(std::istream& stream);
+    
+    bool saveJsonFile(const std::string& filepath, int indent = 2) const noexcept;
+    bool saveJsonStream(std::ostream& stream, int indent = 2) const noexcept;
+    std::string saveToJsonString(int indent = 2) const noexcept;
+    
+    void saveJsonFileOrThrow(const std::string& filepath, int indent = 2) const;
+    void saveJsonStreamOrThrow(std::ostream& stream, int indent = 2) const;
+    
+    std::shared_ptr<JsonValue> toJson() const;
+    void fromJson(const std::shared_ptr<JsonValue>& json);
     
     bool hasSection(const std::string& sectionName) const;
     bool hasKey(const std::string& sectionName, const std::string& keyName) const;

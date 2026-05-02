@@ -13,6 +13,7 @@ set(LIB_SOURCES
     src/IniParser.cpp
     src/IniConfig.cpp
     src/IniValidator.cpp
+    src/JsonParser.cpp
 )
 
 set(LIB_HEADERS
@@ -20,6 +21,7 @@ set(LIB_HEADERS
     include/IniConfig.h
     include/IniValidator.h
     include/IniExceptions.h
+    include/JsonParser.h
 )
 
 add_library(IniConfigLib STATIC ${LIB_SOURCES} ${LIB_HEADERS})

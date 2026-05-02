@@ -5,6 +5,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
 
 namespace INI {
 
@@ -603,6 +604,228 @@ std::string IniConfig::getLoadedFile() const
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_loadedFile;
+}
+
+std::shared_ptr<JsonValue> IniConfig::toJson() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
+    auto root = JsonValue::createObject();
+    
+    for (const auto& [sectionName, keyValues] : m_data) {
+        if (sectionName == m_options.defaultSectionName && keyValues.empty()) {
+            continue;
+        }
+        
+        auto sectionObj = JsonValue::createObject();
+        
+        for (const auto& [key, value] : keyValues) {
+            bool parseSuccess = false;
+            long long intVal = 0;
+            double doubleVal = 0.0;
+            bool boolVal = false;
+            
+            if (value == "true" || value == "false" || 
+                value == "yes" || value == "no" ||
+                value == "on" || value == "off") {
+                boolVal = stringToBool(value, parseSuccess);
+                if (parseSuccess) {
+                    sectionObj->set(key, boolVal);
+                    continue;
+                }
+            }
+            
+            try {
+                intVal = std::stoll(value);
+                if (std::to_string(intVal) == value) {
+                    sectionObj->set(key, intVal);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                doubleVal = std::stod(value);
+                sectionObj->set(key, doubleVal);
+                continue;
+            } catch (...) {}
+            
+            sectionObj->set(key, value);
+        }
+        
+        root->set(sectionName, sectionObj);
+    }
+    
+    return root;
+}
+
+void IniConfig::fromJson(const std::shared_ptr<JsonValue>& json)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
+    if (!json || !json->isObject()) {
+        throw JsonException("JSON root must be an object");
+    }
+    
+    m_data.clear();
+    m_includedFiles.clear();
+    m_warnings.clear();
+    m_validationErrors.clear();
+    
+    auto rootObj = json->getObject();
+    auto defaultSection = normalizeSection(m_options.defaultSectionName);
+    
+    for (const auto& [sectionName, sectionValue] : rootObj) {
+        if (!sectionValue) {
+            continue;
+        }
+        
+        if (!sectionValue->isObject()) {
+            m_warnings.push_back("Skipping section '" + sectionName + "': value is not an object");
+            continue;
+        }
+        
+        auto normalizedSection = normalizeSection(sectionName);
+        auto& targetSection = m_data[normalizedSection];
+        
+        auto keyValues = sectionValue->getObject();
+        for (const auto& [key, value] : keyValues) {
+            if (!value) {
+                continue;
+            }
+            
+            std::string strValue;
+            switch (value->getType()) {
+                case JsonType::Null:
+                    strValue = "null";
+                    break;
+                case JsonType::Boolean:
+                    strValue = value->getBoolean() ? "true" : "false";
+                    break;
+                case JsonType::Integer:
+                    strValue = std::to_string(value->getInteger());
+                    break;
+                case JsonType::Double: {
+                    std::ostringstream oss;
+                    oss << std::setprecision(15) << value->getDouble();
+                    strValue = oss.str();
+                    break;
+                }
+                case JsonType::String:
+                    strValue = value->getString();
+                    break;
+                case JsonType::Array:
+                case JsonType::Object:
+                    m_warnings.push_back("Skipping nested object/array at '" + sectionName + "." + key + "'");
+                    continue;
+            }
+            
+            targetSection[normalizeKey(key)] = strValue;
+        }
+    }
+}
+
+void IniConfig::loadJsonFileOrThrow(const std::string& filepath)
+{
+    JsonParser parser;
+    auto result = parser.parseFile(filepath);
+    fromJson(result.root);
+}
+
+void IniConfig::loadJsonStringOrThrow(const std::string& content)
+{
+    JsonParser parser;
+    auto result = parser.parseString(content);
+    fromJson(result.root);
+}
+
+void IniConfig::loadJsonStreamOrThrow(std::istream& stream)
+{
+    JsonParser parser;
+    auto result = parser.parseStream(stream);
+    fromJson(result.root);
+}
+
+bool IniConfig::loadJsonFile(const std::string& filepath) noexcept
+{
+    try {
+        loadJsonFileOrThrow(filepath);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool IniConfig::loadJsonString(const std::string& content) noexcept
+{
+    try {
+        loadJsonStringOrThrow(content);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool IniConfig::loadJsonStream(std::istream& stream) noexcept
+{
+    try {
+        loadJsonStreamOrThrow(stream);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+void IniConfig::saveJsonFileOrThrow(const std::string& filepath, int indent) const
+{
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw FileException(filepath, "open");
+    }
+    
+    saveJsonStreamOrThrow(file, indent);
+}
+
+void IniConfig::saveJsonStreamOrThrow(std::ostream& stream, int indent) const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
+    auto json = toJson();
+    JsonParser::write(json, stream, indent);
+    
+    if (!stream.good()) {
+        throw FileException("", "write");
+    }
+}
+
+bool IniConfig::saveJsonFile(const std::string& filepath, int indent) const noexcept
+{
+    try {
+        saveJsonFileOrThrow(filepath, indent);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool IniConfig::saveJsonStream(std::ostream& stream, int indent) const noexcept
+{
+    try {
+        saveJsonStreamOrThrow(stream, indent);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+std::string IniConfig::saveToJsonString(int indent) const noexcept
+{
+    try {
+        std::ostringstream oss;
+        saveJsonStream(oss, indent);
+        return oss.str();
+    } catch (...) {
+        return "";
+    }
 }
 
 } // namespace INI
