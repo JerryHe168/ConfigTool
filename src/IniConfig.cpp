@@ -131,6 +131,8 @@ double IniConfig::stringToDouble(const std::string& str, bool& success)
 
 void IniConfig::loadFileOrThrow(const std::string& filepath)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     IniParser parser(m_options);
     ParseResult result = parser.parseFile(filepath);
     
@@ -142,6 +144,8 @@ void IniConfig::loadFileOrThrow(const std::string& filepath)
 
 void IniConfig::loadStringOrThrow(const std::string& content)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     IniParser parser(m_options);
     ParseResult result = parser.parseString(content);
     
@@ -153,6 +157,8 @@ void IniConfig::loadStringOrThrow(const std::string& content)
 
 void IniConfig::loadStreamOrThrow(std::istream& stream)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     IniParser parser(m_options);
     ParseResult result = parser.parseStream(stream);
     
@@ -194,6 +200,8 @@ bool IniConfig::loadStream(std::istream& stream) noexcept
 
 void IniConfig::saveFileOrThrow(const std::string& filepath) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         throw FileException(filepath, "open");
@@ -204,6 +212,8 @@ void IniConfig::saveFileOrThrow(const std::string& filepath) const
 
 void IniConfig::saveStreamOrThrow(std::ostream& stream) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     bool isFirstSection = true;
     
     for (const auto& [sectionName, keyValues] : m_data) {
@@ -268,11 +278,14 @@ std::string IniConfig::saveToString() const noexcept
 
 bool IniConfig::hasSection(const std::string& sectionName) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_data.find(normalizeSection(sectionName)) != m_data.end();
 }
 
 bool IniConfig::hasKey(const std::string& sectionName, const std::string& keyName) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
         return false;
@@ -283,6 +296,8 @@ bool IniConfig::hasKey(const std::string& sectionName, const std::string& keyNam
 
 std::vector<std::string> IniConfig::getSectionNames() const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     std::vector<std::string> names;
     for (const auto& [sectionName, _] : m_data) {
         names.push_back(sectionName);
@@ -292,6 +307,8 @@ std::vector<std::string> IniConfig::getSectionNames() const
 
 std::vector<std::string> IniConfig::getKeys(const std::string& sectionName) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     std::vector<std::string> keys;
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
@@ -309,6 +326,8 @@ std::vector<std::string> IniConfig::getKeys(const std::string& sectionName) cons
 std::string IniConfig::get(const std::string& sectionName, const std::string& keyName,
                             const std::string& defaultValue) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
         return defaultValue;
@@ -332,7 +351,7 @@ bool IniConfig::getBool(const std::string& sectionName, const std::string& keyNa
 bool IniConfig::getBool(const std::string& sectionName, const std::string& keyName,
                          bool defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -361,7 +380,7 @@ int IniConfig::getInt(const std::string& sectionName, const std::string& keyName
 int IniConfig::getInt(const std::string& sectionName, const std::string& keyName,
                        int defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -390,7 +409,7 @@ long IniConfig::getLong(const std::string& sectionName, const std::string& keyNa
 long IniConfig::getLong(const std::string& sectionName, const std::string& keyName,
                          long defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -419,7 +438,7 @@ double IniConfig::getDouble(const std::string& sectionName, const std::string& k
 double IniConfig::getDouble(const std::string& sectionName, const std::string& keyName,
                              double defaultValue, bool* success) const
 {
-    if (success) *success = false;
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
@@ -447,6 +466,7 @@ std::string IniConfig::getString(const std::string& sectionName, const std::stri
 void IniConfig::set(const std::string& sectionName, const std::string& keyName,
                      const std::string& value)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_data[normalizeSection(sectionName)][normalizeKey(keyName)] = value;
 }
 
@@ -475,6 +495,8 @@ void IniConfig::setDouble(const std::string& sectionName, const std::string& key
 
 bool IniConfig::removeSection(const std::string& sectionName)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     auto it = m_data.find(normalizeSection(sectionName));
     if (it == m_data.end()) {
         return false;
@@ -486,6 +508,8 @@ bool IniConfig::removeSection(const std::string& sectionName)
 
 bool IniConfig::removeKey(const std::string& sectionName, const std::string& keyName)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     auto sectionIt = m_data.find(normalizeSection(sectionName));
     if (sectionIt == m_data.end()) {
         return false;
@@ -502,6 +526,8 @@ bool IniConfig::removeKey(const std::string& sectionName, const std::string& key
 
 void IniConfig::clear()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     m_data.clear();
     m_includedFiles.clear();
     m_warnings.clear();
@@ -511,11 +537,14 @@ void IniConfig::clear()
 
 void IniConfig::setValidator(std::shared_ptr<IniValidator> validator)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_validator = validator;
 }
 
 std::vector<std::string> IniConfig::validateAndGetErrors() const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     std::vector<std::string> errors;
     
     if (!m_validator) {
@@ -528,13 +557,52 @@ std::vector<std::string> IniConfig::validateAndGetErrors() const
 
 bool IniConfig::validate() const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    
     m_validationErrors = validateAndGetErrors();
     return m_validationErrors.empty();
 }
 
 void IniConfig::clearValidationErrors()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_validationErrors.clear();
+}
+
+std::vector<std::string> IniConfig::getIncludedFiles() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    return m_includedFiles;
+}
+
+std::vector<std::string> IniConfig::getWarnings() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    return m_warnings;
+}
+
+std::vector<std::string> IniConfig::getValidationErrors() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    return m_validationErrors;
+}
+
+ParseOptions IniConfig::getOptions() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    return m_options;
+}
+
+void IniConfig::setOptions(const ParseOptions& options)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    m_options = options;
+}
+
+std::string IniConfig::getLoadedFile() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    return m_loadedFile;
 }
 
 } // namespace INI

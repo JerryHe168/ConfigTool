@@ -37,13 +37,15 @@ mixed_case = TrUe
     config.getBool("booleans", "true_val", false, &success);
     assert(success == true);
     
+    bool success2 = false;
     assert(!config.hasKey("booleans", "invalid"));
-    config.getBool("booleans", "invalid", false, &success);
-    assert(success == false);
+    config.getBool("booleans", "invalid", false, &success2);
+    assert(success2 == false);
     
+    bool success3 = false;
     config.set("test", "invalid_bool", "not_a_bool");
-    config.getBool("test", "invalid_bool", true, &success);
-    assert(success == false);
+    config.getBool("test", "invalid_bool", true, &success3);
+    assert(success3 == false);
     assert(config.getBool("test", "invalid_bool", true) == true);
     
     config.setBool("test", "new_true", true);

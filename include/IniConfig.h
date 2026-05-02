@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <mutex>
 
 namespace INI {
 
@@ -83,14 +84,14 @@ public:
     std::vector<std::string> validateAndGetErrors() const;
     void clearValidationErrors();
     
-    const std::vector<std::string>& getIncludedFiles() const noexcept { return m_includedFiles; }
-    const std::vector<std::string>& getWarnings() const noexcept { return m_warnings; }
-    const std::vector<std::string>& getValidationErrors() const noexcept { return m_validationErrors; }
+    std::vector<std::string> getIncludedFiles() const;
+    std::vector<std::string> getWarnings() const;
+    std::vector<std::string> getValidationErrors() const;
     
-    const ParseOptions& getOptions() const noexcept { return m_options; }
-    void setOptions(const ParseOptions& options) { m_options = options; }
+    ParseOptions getOptions() const;
+    void setOptions(const ParseOptions& options);
     
-    const std::string& getLoadedFile() const noexcept { return m_loadedFile; }
+    std::string getLoadedFile() const;
     
 private:
     ParseOptions m_options;
@@ -100,6 +101,7 @@ private:
     mutable std::vector<std::string> m_validationErrors;
     std::shared_ptr<IniValidator> m_validator;
     std::string m_loadedFile;
+    mutable std::recursive_mutex m_mutex;
     
     std::string normalizeSection(const std::string& name) const;
     std::string normalizeKey(const std::string& name) const;
